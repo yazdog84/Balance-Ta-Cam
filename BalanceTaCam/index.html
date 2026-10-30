@@ -376,8 +376,8 @@ $("btn-register").onclick = event =>
     if (!$("register-email").checkValidity() || !email) {
       throw new Error("Entre une adresse email valide.");
     }
-    if (password.length < 12) {
-      throw new Error("Choisis un mot de passe d’au moins 12 caractères.");
+    if (password.length < 6) {
+      throw new Error("Choisis un mot de passe d’au moins 6 caractères.");
     }
 
     const { data, error } = await db.auth.signUp({
