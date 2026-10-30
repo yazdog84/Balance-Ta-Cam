@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Signale et consulte les caméras de surveillance autour de toi.">
 <title>Balance Ta Cam</title>
 
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#12232e">
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
@@ -18,53 +20,65 @@ body{background:#e8f0f2;color:#12232e;min-height:100vh}
 header{background:#12232e;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px}
 .brand h1{font-size:22px}
-header .actions{display:flex;gap:10px;flex-wrap:wrap}
+header .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.user-tag{font-size:14px;opacity:.8}
 
-button{border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:#f2b705;color:#12232e}
+button{border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:#f2b705;color:#12232e;font-size:15px}
 button.secondary{background:#20303c;color:#fff}
+button.share{background:#0b6bcb;color:#fff}
 button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #0b6bcb;outline-offset:2px}
 
 main{max-width:1000px;margin:0 auto;padding:20px}
 .card{background:#fff;border-radius:16px;padding:18px;box-shadow:0 6px 18px rgba(0,0,0,.08);margin-bottom:18px}
-h2{margin-bottom:10px}
+h2{margin-bottom:10px;font-size:20px}
 p.muted{color:#5b6b76}
 
 #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(180deg,#e8f0f2,#d7e5ea)}
 .auth-box{background:#fff;border-radius:20px;padding:28px;width:100%;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
 .title-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px}
 .camera-logo{width:80px;height:66px}
-.auth-box h2{text-align:center;margin-bottom:6px}
+.auth-box h1{font-size:24px;text-align:center}
 .auth-box .sub{text-align:center;color:#5b6b76;margin-bottom:18px}
 
 label{display:block;font-weight:700;margin:12px 0 6px}
-input,select,textarea{width:100%;padding:12px;border:2px solid #d7e5ea;border-radius:10px;font-size:16px}
+input,select,textarea{width:100%;padding:12px;border:2px solid #d7e5ea;border-radius:10px;font-size:16px;background:#fff}
+input:focus,select:focus,textarea:focus{border-color:#0b6bcb}
 textarea{min-height:90px;resize:vertical}
 .btn-full{width:100%;margin-top:16px;padding:14px;font-size:16px}
 .auth-switch{text-align:center;margin-top:14px;font-size:14px}
-.auth-switch a{color:#0b6bcb;cursor:pointer;text-decoration:underline}
+.auth-switch a{color:#0b6bcb;text-decoration:underline}
 
 #map{height:420px;border-radius:14px;overflow:hidden;border:2px solid #d7e5ea}
 .map-tools{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+#point-info{margin-top:10px;font-size:14px}
 
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:700px){.form-grid{grid-template-columns:1fr}}
 .form-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
 
 .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filters button{background:#e6eef1;color:#12232e}
 .filters button.active{background:#12232e;color:#fff}
 
 .report{border:2px solid #e6eef1;border-radius:14px;padding:14px;margin-bottom:12px}
-.report-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.report-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
 .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;background:#fff4d6;color:#8a6100}
 .badge.ok{background:#e6f6ea;color:#1c7c3c}
-.report h3{margin:6px 0 4px}
-.report p{margin:4px 0}
+.badge.rejected{background:#fde8e8;color:#8c1d1d}
+.report h3{margin:6px 0 4px;font-size:18px}
+.report p{margin:4px 0;overflow-wrap:anywhere}
 .report .meta{font-size:13px;color:#5b6b76}
-.report-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.report-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
 .report-actions button{padding:8px 10px;font-size:13px}
+.report-actions .note{font-size:13px;color:#5b6b76}
 
-#status{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#12232e;color:#fff;padding:12px 18px;border-radius:12px;display:none;z-index:9999}
+.empty{padding:18px;border:2px dashed #d7e5ea;border-radius:14px;color:#5b6b76;text-align:center}
+
+#status{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#12232e;color:#fff;padding:12px 18px;border-radius:12px;display:none;z-index:9999;max-width:calc(100% - 32px);text-align:center}
 #status.show{display:block}
+#status[data-kind="error"]{background:#8c1d1d}
+#status[data-kind="ok"]{background:#1c7c3c}
 </style>
 </head>
 <body>
@@ -72,98 +86,108 @@ textarea{min-height:90px;resize:vertical}
 <section id="auth">
   <div class="auth-box">
     <div class="title-row">
-      <h2>Balance Ta Cam</h2>
+      <h1>Balance Ta Cam</h1>
       <svg class="camera-logo" viewBox="0 0 100 88" aria-hidden="true">
-        <path d="M34 26 Q40 20 46 26" stroke="#12232e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-        <path d="M28 18 Q40 6 52 18" stroke="#12232e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-        <path d="M22 10 Q40 -8 58 10" stroke="#12232e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
         <rect x="10" y="34" width="56" height="30" rx="10" fill="#f2b705" stroke="#12232e" stroke-width="3"/>
         <path d="M66 40 L88 30 L88 68 L66 58 Z" fill="#f2b705" stroke="#12232e" stroke-width="3"/>
         <circle cx="31" cy="49" r="9" fill="#fff" stroke="#12232e" stroke-width="2.5"/>
-        <circle cx="28" cy="50" r="3.5" fill="#12232e"/>
         <circle cx="53" cy="49" r="9" fill="#fff" stroke="#12232e" stroke-width="2.5"/>
-        <circle cx="56" cy="50" r="3.5" fill="#12232e"/>
       </svg>
     </div>
 
     <p class="sub">Signale les caméras de surveillance autour de toi.</p>
 
-    <div id="login-form">
+    <form id="login-form" novalidate>
       <label for="login-email">Email</label>
-      <input id="login-email" type="email" placeholder="ton@email.com">
-      <label for="login-password">Mot de passe</label>
-      <input id="login-password" type="password" placeholder="Ton mot de passe">
-      <button class="btn-full" id="btn-login">Se connecter</button>
-      <p class="auth-switch">Pas encore de compte ? <a id="show-register">Créer un compte</a></p>
-    </div>
+      <input id="login-email" name="email" type="email" autocomplete="username" placeholder="ton@email.com" required>
 
-    <div id="register-form" class="hidden">
+      <label for="login-password">Mot de passe</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Ton mot de passe" required>
+
+      <button class="btn-full" type="submit">Se connecter</button>
+      <p class="auth-switch">Pas encore de compte ? <a href="#" id="show-register">Créer un compte</a></p>
+    </form>
+
+    <form id="register-form" class="hidden" novalidate>
       <label for="register-pseudo">Pseudo</label>
-      <input id="register-pseudo" type="text" placeholder="Ton pseudo">
+      <input id="register-pseudo" name="pseudo" type="text" autocomplete="nickname" placeholder="Ton pseudo" required>
+
       <label for="register-email">Email</label>
-      <input id="register-email" type="email" placeholder="ton@email.com">
+      <input id="register-email" name="email" type="email" autocomplete="username" placeholder="ton@email.com" required>
+
       <label for="register-password">Mot de passe</label>
-      <input id="register-password" type="password" placeholder="Choisis un mot de passe">
-      <button class="btn-full" id="btn-register">Créer mon compte</button>
-      <p class="auth-switch">Tu as déjà un compte ? <a id="show-login">Se connecter</a></p>
-    </div>
+      <input id="register-password" name="password" type="password" autocomplete="new-password" placeholder="8 caractères minimum" minlength="8" required>
+
+      <button class="btn-full" type="submit">Créer mon compte</button>
+      <p class="auth-switch">Tu as déjà un compte ? <a href="#" id="show-login">Se connecter</a></p>
+    </form>
   </div>
 </section>
 
 <div id="app" class="hidden">
   <header>
     <div class="brand">
-      <span>🎥</span>
+      <span aria-hidden="true">🎥</span>
       <h1>Balance Ta Cam</h1>
     </div>
     <div class="actions">
-      <button id="btn-my-area">Ma zone</button>
-      <button id="btn-logout" class="secondary">Déconnexion</button>
+      <span id="user-tag" class="user-tag"></span>
+      <button id="btn-share-app" type="button" class="share">📤 Partager</button>
+      <button id="btn-my-area" type="button">Ma zone</button>
+      <button id="btn-logout" type="button" class="secondary">Déconnexion</button>
     </div>
   </header>
 
   <main>
     <section class="card">
       <h2>Carte des caméras</h2>
-      <p class="muted">Clique sur la carte pour choisir l’endroit du signalement.</p>
+      <p class="muted">Clique sur la carte pour choisir l’endroit du signalement, puis remplis le formulaire.</p>
       <div id="map"></div>
       <div class="map-tools">
-        <button id="btn-center">Recentrer sur moi</button>
+        <button id="btn-center" type="button">Recentrer sur moi</button>
+        <button id="btn-clear-point" type="button" class="secondary" disabled>Effacer le point</button>
       </div>
+      <p id="point-info" class="muted">Aucun point sélectionné.</p>
     </section>
 
     <section class="card">
       <h2>Nouveau signalement</h2>
-      <div class="form-grid">
-        <div>
-          <label for="camera-type">Type de caméra</label>
-          <select id="camera-type">
-            <option value="publique">Caméra publique</option>
-            <option value="privee">Caméra privée</option>
-            <option value="douteuse">Caméra douteuse</option>
-          </select>
+      <form id="report-form" novalidate>
+        <div class="form-grid">
+          <div>
+            <label for="camera-type">Type de caméra</label>
+            <select id="camera-type" name="type">
+              <option value="publique">Caméra publique</option>
+              <option value="privee">Caméra privée</option>
+              <option value="douteuse">Caméra douteuse</option>
+            </select>
+          </div>
+          <div>
+            <label for="camera-place">Lieu</label>
+            <input id="camera-place" name="place" type="text" maxlength="120" placeholder="Ex : devant la boulangerie" required>
+          </div>
         </div>
-        <div>
-          <label for="camera-place">Lieu</label>
-          <input id="camera-place" type="text" placeholder="Ex : devant la boulangerie">
+
+        <label for="camera-description">Description</label>
+        <textarea id="camera-description" name="description" maxlength="1000"
+          placeholder="Décris la caméra, sa position, ce qu’elle filme…" required></textarea>
+
+        <div class="form-actions">
+          <button id="btn-save-report" type="submit">Enregistrer le signalement</button>
+          <button id="btn-clear-form" type="button" class="secondary">Effacer</button>
         </div>
-      </div>
-      <label for="camera-description">Description</label>
-      <textarea id="camera-description" placeholder="Décris la caméra, sa position, ce qu’elle filme…"></textarea>
-      <div class="form-actions">
-        <button id="btn-save-report">Enregistrer le signalement</button>
-        <button id="btn-clear-form" class="secondary">Effacer</button>
-      </div>
+      </form>
     </section>
 
     <section class="card">
       <h2>Signalements</h2>
       <p id="reports-counter" class="muted"></p>
 
-      <div class="filters">
-        <button class="filter active" data-filter="all">Tous</button>
-        <button class="filter" data-filter="waiting">En attente</button>
-        <button class="filter" data-filter="validated">Validés</button>
+      <div class="filters" role="group" aria-label="Filtrer les signalements">
+        <button class="filter active" type="button" data-filter="all" aria-pressed="true">Tous</button>
+        <button class="filter" type="button" data-filter="waiting" aria-pressed="false">En attente</button>
+        <button class="filter" type="button" data-filter="validated" aria-pressed="false">Validés</button>
+        <button class="filter" type="button" data-filter="rejected" aria-pressed="false">Réfutés</button>
       </div>
 
       <div id="reports-list"></div>
@@ -171,362 +195,591 @@ textarea{min-height:90px;resize:vertical}
   </main>
 </div>
 
-<div id="status"></div>
+<div id="status" role="status" aria-live="polite"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+"use strict";
+
+const THRESHOLDS = { validate: 5, reject: 3 };
+const TYPE_LABELS = {
+  publique: "Caméra publique",
+  privee: "Caméra privée",
+  douteuse: "Caméra douteuse"
+};
+
+const APP_URL = "https://yazdog84.github.io/Balance-Ta-Cam/BalanceTaCam/";
+
 const db = window.supabase.createClient(
   "https://oxwpppuvghsaancjajoc.supabase.co",
   "sb_publishable_1eQSq-_gjzbEAkgaT9X8DA_USkUO2Vn"
 );
 
-const $ = id => document.getElementById(id);
-const APP_URL =
-  "https://yazdog84.github.io/Balance-Ta-Cam/BalanceTaCam/";
+const state = {
+  user: null,
+  reports: [],
+  filter: "all",
+  map: null,
+  marker: null,
+  meMarker: null
+};
 
-let map;
-let selectedMarker;
-let reportMarkers;
-let currentUser = null;
-let reports = [];
-let refreshVersion = 0;
-let statusTimer;
+const el = id => document.getElementById(id);
+const authSection = el("auth");
+const appSection = el("app");
+const statusBox = el("status");
+const reportsList = el("reports-list");
+const reportsCounter = el("reports-counter");
+const pointInfo = el("point-info");
+const clearPointBtn = el("btn-clear-point");
+const loginForm = el("login-form");
+const registerForm = el("register-form");
+const reportForm = el("report-form");
 
-function showStatus(message) {
-  $("status").textContent = message;
-  $("status").classList.add("show");
-  clearTimeout(statusTimer);
-  statusTimer = setTimeout(
-    () => $("status").classList.remove("show"),
-    7000
-  );
+let toastTimer;
+
+function toast(message, kind = "info") {
+  statusBox.textContent = message;
+  statusBox.dataset.kind = kind;
+  statusBox.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => statusBox.classList.remove("show"), 3500);
 }
 
-async function runButton(button, action) {
-  button.disabled = true;
-  try {
-    await action();
-  } catch (error) {
-    showStatus(error.message || "Une erreur est survenue.");
-  } finally {
-    button.disabled = false;
+const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
+  dateStyle: "short",
+  timeStyle: "short"
+});
+const formatDate = value => dateFormatter.format(new Date(value));
+
+function showAuth() {
+  appSection.classList.add("hidden");
+  authSection.classList.remove("hidden");
+}
+
+async function enterApp(user) {
+  state.user = user;
+  el("user-tag").textContent = user.user_metadata?.pseudo || "Membre";
+  authSection.classList.add("hidden");
+  appSection.classList.remove("hidden");
+  initMap();
+  await refreshReports();
+}
+
+async function boot() {
+  const { data, error } = await db.auth.getSession();
+
+  if (error) {
+    showAuth();
+    toast(error.message, "error");
+    return;
+  }
+
+  if (data.session?.user) {
+    await enterApp(data.session.user);
+  } else {
+    showAuth();
   }
 }
 
-function initMap() {
-  map = L.map("map").setView([48.8566, 2.3522], 13);
+function bindAuthForm(form, action) {
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 19
-  }).addTo(map);
+    const submit = form.querySelector('button[type="submit"]');
+    const formData = Object.fromEntries(new FormData(form).entries());
 
-  reportMarkers = L.layerGroup().addTo(map);
+    submit.disabled = true;
 
-  map.on("click", event => {
-    if (selectedMarker) {
-      selectedMarker.setLatLng(event.latlng);
-    } else {
-      selectedMarker = L.marker(event.latlng).addTo(map);
+    try {
+      await action(formData);
+      form.reset();
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      submit.disabled = false;
     }
-    showStatus("Position sélectionnée.");
   });
 }
 
-function textElement(tag, text, className) {
-  const element = document.createElement(tag);
-  element.textContent = text;
-  if (className) element.className = className;
-  return element;
-}
-
-function displayReports() {
-  $("reports-list").replaceChildren();
-  reportMarkers.clearLayers();
-  $("reports-counter").textContent =
-    reports.length + " signalement(s) partagé(s)";
-
-  reports.forEach(report => {
-    const card = document.createElement("article");
-    card.className = "report";
-
-    card.append(
-      textElement("span", "Non vérifié", "badge"),
-      textElement("h3", report.place),
-      textElement("p", report.description),
-      textElement(
-        "p",
-        "Type : " + report.type +
-        " • Par " + report.pseudo +
-        " • " + new Date(report.created_at).toLocaleDateString("fr-FR"),
-        "meta"
-      )
-    );
-
-    const actions = document.createElement("div");
-    actions.className = "report-actions";
-
-    const locate = textElement("button", "Voir sur la carte");
-    locate.onclick = () => {
-      map.setView([report.lat, report.lng], 17);
-      $("map").scrollIntoView({ behavior: "smooth" });
-    };
-    actions.append(locate);
-
-    if (currentUser && report.user_id === currentUser.id) {
-      const remove = textElement("button", "Supprimer mon signalement");
-
-      remove.onclick = () => runButton(remove, async () => {
-        if (!confirm("Supprimer définitivement ce signalement ?")) return;
-
-        const { error } = await db
-          .from("btc_reports")
-          .delete()
-          .eq("id", report.id)
-          .eq("user_id", currentUser.id);
-
-        if (error) throw error;
-        await loadReports();
-        showStatus("Signalement supprimé.");
-      });
-
-      actions.append(remove);
-    }
-
-    card.append(actions);
-    $("reports-list").append(card);
-
-    const popup = document.createElement("div");
-    popup.append(
-      textElement("strong", report.place),
-      textElement("p", report.description)
-    );
-
-    L.marker([report.lat, report.lng])
-      .addTo(reportMarkers)
-      .bindPopup(popup);
+bindAuthForm(loginForm, async data => {
+  const { error } = await db.auth.signInWithPassword({
+    email: data.email,
+    password: data.password
   });
-}
 
-async function loadReports() {
-  if (!currentUser) return;
-
-  const version = ++refreshVersion;
-
-  const { data, error } = await db
-    .from("btc_reports")
-    .select("id,user_id,pseudo,type,place,description,lat,lng,created_at")
-    .order("created_at", { ascending: false })
-    .limit(500);
-
-  if (version !== refreshVersion || !currentUser) return;
   if (error) throw error;
 
-  reports = data || [];
-  displayReports();
-}
+  const { data: sessionData } = await db.auth.getSession();
+  await enterApp(sessionData.session.user);
+  toast("Connexion réussie.", "ok");
+});
 
-function applySession(session) {
-  currentUser = session ? session.user : null;
-  $("auth").classList.toggle("hidden", !!currentUser);
-  $("app").classList.toggle("hidden", !currentUser);
+bindAuthForm(registerForm, async data => {
+  const pseudo = String(data.pseudo || "").trim();
 
-  if (!currentUser) {
-    ++refreshVersion;
-    reports = [];
-    $("reports-list").replaceChildren();
-    if (reportMarkers) reportMarkers.clearLayers();
-    if (selectedMarker) {
-      selectedMarker.remove();
-      selectedMarker = null;
+  if (!pseudo || pseudo.length > 60) {
+    throw new Error("Choisis un pseudo de 1 à 60 caractères.");
+  }
+
+  const { data: result, error } = await db.auth.signUp({
+    email: data.email,
+    password: data.password,
+    options: {
+      data: { pseudo },
+      emailRedirectTo: APP_URL
     }
+  });
+
+  if (error) throw error;
+
+  if (result.session?.user) {
+    await enterApp(result.session.user);
+    toast(`Bienvenue ${pseudo} !`, "ok");
+  } else {
+    el("show-login").click();
+    toast("Vérifie ta boîte mail pour confirmer ton compte.", "ok");
+  }
+});
+
+el("show-register").addEventListener("click", event => {
+  event.preventDefault();
+  loginForm.classList.add("hidden");
+  registerForm.classList.remove("hidden");
+  el("register-pseudo").focus();
+});
+
+el("show-login").addEventListener("click", event => {
+  event.preventDefault();
+  registerForm.classList.add("hidden");
+  loginForm.classList.remove("hidden");
+  el("login-email").focus();
+});
+
+el("btn-logout").addEventListener("click", async () => {
+  await db.auth.signOut();
+  state.user = null;
+  state.reports = [];
+  reportsList.replaceChildren();
+  reportsCounter.textContent = "";
+  showAuth();
+  toast("Tu es déconnecté.");
+});
+
+function initMap() {
+  if (state.map) {
+    state.map.invalidateSize();
     return;
   }
 
-  setTimeout(() => {
-    if (!currentUser) return;
-    if (!map) initMap();
-    map.invalidateSize();
-    loadReports().catch(error => showStatus(error.message));
-  }, 50);
+  state.map = L.map("map").setView([48.8566, 2.3522], 13);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(state.map);
+
+  state.map.on("click", event => {
+    setSelectedPoint(event.latlng.lat, event.latlng.lng);
+  });
 }
 
-$("show-register").onclick = () => {
-  $("login-form").classList.add("hidden");
-  $("register-form").classList.remove("hidden");
-};
+function setSelectedPoint(lat, lng) {
+  if (!state.marker) {
+    state.marker = L.marker([lat, lng], { draggable: true }).addTo(state.map);
 
-$("show-login").onclick = () => {
-  $("register-form").classList.add("hidden");
-  $("login-form").classList.remove("hidden");
-};
-
-$("btn-register").onclick = event =>
-  runButton(event.currentTarget, async () => {
-    const pseudo = $("register-pseudo").value.trim();
-    const email = $("register-email").value.trim();
-    const password = $("register-password").value;
-
-    if (!pseudo || pseudo.length > 60) {
-      throw new Error("Choisis un pseudo de 1 à 60 caractères.");
-    }
-    if (!$("register-email").checkValidity() || !email) {
-      throw new Error("Entre une adresse email valide.");
-    }
-    if (password.length < 6) {
-      throw new Error("Choisis un mot de passe d’au moins 6 caractères.");
-    }
-
-    const { data, error } = await db.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { pseudo },
-        emailRedirectTo: APP_URL
-      }
+    state.marker.on("dragend", () => {
+      const position = state.marker.getLatLng();
+      updatePointInfo(position.lat, position.lng);
     });
+  } else {
+    state.marker.setLatLng([lat, lng]);
+  }
 
-    if (error) throw error;
+  state.marker.bindPopup("Point du signalement").openPopup();
+  updatePointInfo(lat, lng);
+}
 
-    $("register-password").value = "";
+function updatePointInfo(lat, lng) {
+  pointInfo.textContent = state.marker
+    ? `Point choisi : ${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    : "Aucun point sélectionné.";
 
-    if (data.session) {
-      showStatus("Compte créé. Tu es connecté.");
-    } else {
-      $("show-login").click();
-      showStatus(
-        "Si l’inscription est acceptée, tu recevras un email. " +
-        "Vérifie ta boîte et les indésirables, puis confirme ton adresse."
-      );
-    }
-  });
+  clearPointBtn.disabled = !state.marker;
+}
 
-$("btn-login").onclick = event =>
-  runButton(event.currentTarget, async () => {
-    const email = $("login-email").value.trim();
-    const password = $("login-password").value;
+function clearPoint() {
+  if (state.marker) {
+    state.marker.remove();
+    state.marker = null;
+  }
 
-    if (!email || !password) {
-      throw new Error("Entre ton email et ton mot de passe.");
-    }
+  updatePointInfo();
+}
 
-    const { error } = await db.auth.signInWithPassword({
-      email,
-      password
-    });
+clearPointBtn.addEventListener("click", clearPoint);
 
-    if (error) throw error;
-    $("login-password").value = "";
-    showStatus("Connexion réussie.");
-  });
-
-$("btn-logout").onclick = event =>
-  runButton(event.currentTarget, async () => {
-    const { error } = await db.auth.signOut();
-    if (error) throw error;
-    showStatus("Déconnexion effectuée.");
-  });
-
-function centerOnMe() {
+el("btn-center").addEventListener("click", () => {
   if (!navigator.geolocation) {
-    showStatus("Géolocalisation indisponible.");
-    return;
+    return toast("La géolocalisation n’est pas disponible.", "error");
   }
 
   navigator.geolocation.getCurrentPosition(
     position => {
-      if (!currentUser || !map) return;
-      map.setView(
-        [position.coords.latitude, position.coords.longitude],
-        16
-      );
-      showStatus("Carte recentrée. Touche la carte pour choisir un point.");
+      const { latitude, longitude } = position.coords;
+      state.map.setView([latitude, longitude], 16);
+
+      if (!state.meMarker) {
+        state.meMarker = L.marker([latitude, longitude]).addTo(state.map);
+      } else {
+        state.meMarker.setLatLng([latitude, longitude]);
+      }
+
+      state.meMarker.bindPopup("Tu es ici").openPopup();
+      toast("Carte recentrée sur ta position.", "ok");
     },
-    () => showStatus(
-      "Position inaccessible. Autorise la localisation ou choisis un point sur la carte."
-    ),
-    { timeout: 15000, maximumAge: 60000 }
+    () => toast("Impossible d’accéder à ta position.", "error"),
+    { enableHighAccuracy: true, timeout: 8000 }
   );
-}
-
-$("btn-center").onclick = centerOnMe;
-$("btn-my-area").onclick = centerOnMe;
-
-function clearForm() {
-  $("camera-type").value = "publique";
-  $("camera-place").value = "";
-  $("camera-description").value = "";
-
-  if (selectedMarker) {
-    selectedMarker.remove();
-    selectedMarker = null;
-  }
-}
-
-$("btn-clear-form").onclick = clearForm;
-
-$("camera-place").maxLength = 200;
-$("camera-description").maxLength = 2000;
-
-$("btn-save-report").onclick = event =>
-  runButton(event.currentTarget, async () => {
-    if (!currentUser) throw new Error("Connecte-toi d’abord.");
-    if (!selectedMarker) {
-      throw new Error("Choisis un point sur la carte.");
-    }
-
-    const place = $("camera-place").value.trim();
-    const description = $("camera-description").value.trim();
-
-    if (!place || !description) {
-      throw new Error("Ajoute un lieu et une description.");
-    }
-
-    const position = selectedMarker.getLatLng();
-    const pseudo = String(
-      currentUser.user_metadata?.pseudo || "Membre"
-    ).slice(0, 60);
-
-    const { error } = await db.from("btc_reports").insert({
-      user_id: currentUser.id,
-      pseudo,
-      type: $("camera-type").value,
-      place,
-      description,
-      lat: position.lat,
-      lng: position.lng
-    });
-
-    if (error) throw error;
-
-    clearForm();
-    await loadReports();
-    showStatus("Signalement enregistré dans la base partagée.");
-  });
-
-const filters = document.querySelector(".filters");
-if (filters) filters.classList.add("hidden");
-
-const refreshButton = textElement("button", "Actualiser les signalements");
-refreshButton.className = "secondary";
-refreshButton.style.marginBottom = "12px";
-refreshButton.onclick = () => runButton(refreshButton, loadReports);
-$("reports-list").before(refreshButton);
-
-db.auth.onAuthStateChange((_event, session) => {
-  applySession(session);
 });
 
-db.auth.getSession().then(({ data, error }) => {
-  if (error) {
-    showStatus(error.message);
+el("btn-my-area").addEventListener("click", () => {
+  const mine = state.reports.filter(
+    report => report.user_id === state.user?.id
+  );
+
+  if (mine.length === 0) {
+    return toast("Tu n’as encore aucun signalement.");
+  }
+
+  const bounds = L.latLngBounds(mine.map(report => [report.lat, report.lng]));
+  state.map.fitBounds(bounds.pad(0.3), { maxZoom: 16 });
+});
+
+el("btn-share-app").addEventListener("click", async () => {
+  const shareData = {
+    title: "Balance Ta Cam",
+    text: "Viens découvrir Balance Ta Cam !",
+    url: APP_URL
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+    } catch {
+      /* Menu fermé par l’utilisateur */
+    }
     return;
   }
-  applySession(data.session);
+
+  try {
+    await navigator.clipboard.writeText(APP_URL);
+    toast("Lien de l’app copié !", "ok");
+  } catch {
+    prompt("Copie ce lien :", APP_URL);
+  }
 });
+
+async function refreshReports() {
+  const { data, error } = await db
+    .from("btc_reports")
+    .select(`
+      id,
+      user_id,
+      pseudo,
+      type,
+      place,
+      description,
+      lat,
+      lng,
+      status,
+      validate_count,
+      reject_count,
+      created_at,
+      btc_report_votes(user_id, value)
+    `)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    toast(error.message, "error");
+    return;
+  }
+
+  state.reports = data || [];
+  renderReports();
+}
+
+function renderReports() {
+  const total = state.reports.length;
+  const validated = state.reports.filter(r => r.status === "validated").length;
+  const rejected = state.reports.filter(r => r.status === "rejected").length;
+  const waiting = total - validated - rejected;
+
+  reportsCounter.textContent =
+    `${total} signalement${total > 1 ? "s" : ""} • ` +
+    `${validated} validé${validated > 1 ? "s" : ""} • ` +
+    `${waiting} en attente • ${rejected} réfuté${rejected > 1 ? "s" : ""}`;
+
+  const visible = state.reports.filter(report => {
+    if (state.filter === "waiting") return report.status === "waiting";
+    if (state.filter === "validated") return report.status === "validated";
+    if (state.filter === "rejected") return report.status === "rejected";
+    return true;
+  });
+
+  reportsList.replaceChildren();
+
+  if (visible.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "Aucun signalement à afficher.";
+    reportsList.appendChild(empty);
+    return;
+  }
+
+  for (const report of visible) {
+    reportsList.appendChild(reportCard(report));
+  }
+}
+
+function reportCard(report) {
+  const card = document.createElement("article");
+  card.className = "report";
+
+  const top = document.createElement("div");
+  top.className = "report-top";
+
+  const badge = document.createElement("span");
+
+  if (report.status === "validated") {
+    badge.className = "badge ok";
+    badge.textContent = "Validé";
+  } else if (report.status === "rejected") {
+    badge.className = "badge rejected";
+    badge.textContent = "Réfuté";
+  } else {
+    badge.className = "badge";
+    badge.textContent =
+      `En attente • ${report.validate_count}/${THRESHOLDS.validate}`;
+  }
+
+  top.appendChild(badge);
+
+  const date = document.createElement("span");
+  date.className = "meta";
+  date.textContent = formatDate(report.created_at);
+  top.appendChild(date);
+  card.appendChild(top);
+
+  const title = document.createElement("h3");
+  title.textContent = report.place;
+  card.appendChild(title);
+
+  const description = document.createElement("p");
+  description.textContent = report.description;
+  card.appendChild(description);
+
+  const meta = document.createElement("p");
+  meta.className = "meta";
+  meta.textContent =
+    `Type : ${TYPE_LABELS[report.type] || report.type} • ` +
+    `Par ${report.pseudo}`;
+  card.appendChild(meta);
+
+  if (report.reject_count > 0) {
+    const refutes = document.createElement("p");
+    refutes.className = "meta";
+    refutes.textContent =
+      `${report.reject_count}/${THRESHOLDS.reject} réfutation(s)`;
+    card.appendChild(refutes);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "report-actions";
+
+  const locate = document.createElement("button");
+  locate.type = "button";
+  locate.textContent = "Voir sur la carte";
+  locate.addEventListener("click", () => {
+    state.map.setView([report.lat, report.lng], 17);
+    el("map").scrollIntoView({ behavior: "smooth" });
+  });
+  actions.appendChild(locate);
+
+  const myVote = report.btc_report_votes?.find(
+    vote => vote.user_id === state.user?.id
+  )?.value || 0;
+
+  const isMine = report.user_id === state.user?.id;
+
+  if (isMine) {
+    const note = document.createElement("span");
+    note.className = "note";
+    note.textContent = "Ton signalement";
+    actions.appendChild(note);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Supprimer";
+
+    remove.addEventListener("click", async () => {
+      if (!confirm("Supprimer définitivement ce signalement ?")) return;
+
+      remove.disabled = true;
+
+      const { error } = await db
+        .from("btc_reports")
+        .delete()
+        .eq("id", report.id)
+        .eq("user_id", state.user.id);
+
+      if (error) {
+        toast(error.message, "error");
+        remove.disabled = false;
+        return;
+      }
+
+      await refreshReports();
+      toast("Signalement supprimé.", "ok");
+    });
+
+    actions.appendChild(remove);
+  } else if (report.status === "waiting" && myVote === 0) {
+    actions.append(
+      voteButton(report, 1, "Valider"),
+      voteButton(report, -1, "Réfuter")
+    );
+  } else if (myVote === 1) {
+    const note = document.createElement("span");
+    note.className = "note";
+    note.textContent = "Tu as validé ce signalement.";
+    actions.appendChild(note);
+  } else if (myVote === -1) {
+    const note = document.createElement("span");
+    note.className = "note";
+    note.textContent = "Tu as réfuté ce signalement.";
+    actions.appendChild(note);
+  }
+
+  card.appendChild(actions);
+  return card;
+}
+
+function voteButton(report, value, label) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+
+    const { error } = await db.rpc("vote_report", {
+      p_report_id: report.id,
+      p_value: value
+    });
+
+    if (error) {
+      toast(error.message, "error");
+      button.disabled = false;
+      return;
+    }
+
+    await refreshReports();
+    toast(
+      value === 1
+        ? "Validation enregistrée."
+        : "Réfutation enregistrée.",
+      "ok"
+    );
+  });
+
+  return button;
+}
+
+reportForm.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  if (!state.marker) {
+    return toast("Choisis d’abord un point sur la carte.", "error");
+  }
+
+  const submit = el("btn-save-report");
+  const position = state.marker.getLatLng();
+  const place = el("camera-place").value.trim();
+  const description = el("camera-description").value.trim();
+
+  if (!place || !description) {
+    return toast("Ajoute un lieu et une description.", "error");
+  }
+
+  submit.disabled = true;
+
+  const { error } = await db.from("btc_reports").insert({
+    user_id: state.user.id,
+    pseudo: state.user.user_metadata?.pseudo || "Membre",
+    type: el("camera-type").value,
+    place,
+    description,
+    lat: position.lat,
+    lng: position.lng,
+    status: "waiting"
+  });
+
+  if (error) {
+    toast(error.message, "error");
+    submit.disabled = false;
+    return;
+  }
+
+  reportForm.reset();
+  el("camera-type").value = "publique";
+  clearPoint();
+  await refreshReports();
+  toast("Signalement enregistré !", "ok");
+  submit.disabled = false;
+});
+
+el("btn-clear-form").addEventListener("click", () => {
+  reportForm.reset();
+  el("camera-type").value = "publique";
+  clearPoint();
+  toast("Formulaire effacé.");
+});
+
+document.querySelectorAll(".filter").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".filter").forEach(other => {
+      other.classList.remove("active");
+      other.setAttribute("aria-pressed", "false");
+    });
+
+    button.classList.add("active");
+    button.setAttribute("aria-pressed", "true");
+    state.filter = button.dataset.filter;
+    renderReports();
+  });
+});
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_IN" && session?.user) {
+    enterApp(session.user);
+  }
+
+  if (event === "SIGNED_OUT") {
+    state.user = null;
+    state.reports = [];
+    reportsList.replaceChildren();
+    reportsCounter.textContent = "";
+    showAuth();
+  }
+});
+
+boot();
 </script>
 
 </body>
