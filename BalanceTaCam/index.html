@@ -26,6 +26,8 @@ header{background:#0b3d62;color:#fff;padding:10px 14px;display:flex;flex-directi
 .title-wrap small{display:block;font-size:11px;opacity:.85}
 header .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center}
 
+.counter{background:#f2b705;color:#12232e;border-radius:20px;padding:6px 10px;font-weight:800;font-size:13px;white-space:nowrap}
+
 button{border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:#f2b705;color:#12232e;font-size:15px}
 button.secondary{background:#20303c;color:#fff}
 button.share-btn{background:#0b6bcb;color:#fff;border-radius:50%;width:36px;height:36px;font-size:15px;padding:0}
@@ -77,6 +79,17 @@ textarea{min-height:90px;resize:vertical}
 .report-actions .note{font-size:13px;color:#5b6b76}
 
 .empty{padding:18px;border:2px dashed #d7e5ea;border-radius:14px;color:#5b6b76;text-align:center}
+
+.chat-btn{position:fixed;bottom:16px;right:16px;background:#f2b705;border:none;border-radius:30px;padding:14px 18px;font-size:18px;cursor:pointer;z-index:1000}
+.chat{position:fixed;left:0;right:0;bottom:0;height:72vh;background:#fff;display:none;flex-direction:column;border-radius:16px 16px 0 0;z-index:1100;box-shadow:0 -6px 20px rgba(0,0,0,.2)}
+.chat.open{display:flex}
+.chat header{background:#0b3d62;color:#fff;padding:12px 16px}
+#messages{flex:1;overflow:auto;padding:12px}
+.msg{background:#eef3f7;padding:8px 10px;border-radius:12px;margin-bottom:8px;font-size:14px}
+.msg small{display:block;color:#5b6b76;margin-top:3px}
+.chat-form{display:flex;gap:8px;padding:10px;border-top:1px solid #dbe3ea}
+.chat-form input{flex:1;margin:0}
+.chat .notice{padding:8px 16px;font-size:12px;color:#52616c;background:#f6f8fa;border-bottom:1px solid #dbe3ea}
 
 #status{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#12232e;color:#fff;padding:12px 18px;border-radius:12px;display:none;z-index:9999;max-width:calc(100% - 32px);text-align:center}
 #status.show{display:block}
@@ -145,6 +158,8 @@ textarea{min-height:90px;resize:vertical}
       </div>
 
       <button id="btn-share-app" type="button" class="share-btn">📤</button>
+
+      <div class="counter" id="header-counter">0 caméra</div>
     </div>
 
     <div class="actions">
@@ -210,6 +225,23 @@ textarea{min-height:90px;resize:vertical}
   </main>
 </div>
 
+<button class="chat-btn" id="chat-toggle" type="button">💬</button>
+
+<div class="chat" id="chat">
+  <header><b>Discussion citoyenne</b></header>
+
+  <p class="notice">
+    Respect obligatoire : insultes, racisme, haine, harcèlement et menaces sont interdits.
+  </p>
+
+  <div id="messages"></div>
+
+  <form class="chat-form" id="chat-form">
+    <input id="chat-input" placeholder="Votre message…" maxlength="500" required>
+    <button type="submit" class="secondary">Envoyer</button>
+  </form>
+</div>
+
 <div id="status" role="status" aria-live="polite"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -254,7 +286,15 @@ const loginForm = el("login-form");
 const registerForm = el("register-form");
 const reportForm = el("report-form");
 
+const chatPanel = el("chat");
+const chatToggle = el("chat-toggle");
+const chatForm = el("chat-form");
+const chatInput = el("chat-input");
+const messagesBox = el("messages");
+const headerCounter = el("header-counter");
+
 let toastTimer;
+let chatLoaded = false;
 
 function toast(message, kind = "info") {
   statusBox.textContent = message;
@@ -281,6 +321,7 @@ async function enterApp(user) {
   appSection.classList.remove("hidden");
   initMap();
   await refreshReports();
+  await loadChatMessages();
 }
 
 async function boot() {
@@ -379,6 +420,8 @@ el("btn-logout").addEventListener("click", async () => {
   state.reports = [];
   reportsList.replaceChildren();
   reportsCounter.textContent = "";
+  messagesBox.replaceChildren();
+  chatLoaded = false;
   showAuth();
   toast("Tu es déconnecté.");
 });
@@ -538,6 +581,9 @@ function renderReports() {
     `${total} signalement${total > 1 ? "s" : ""} • ` +
     `${validated} validé${validated > 1 ? "s" : ""} • ` +
     `${waiting} en attente • ${rejected} réfuté${rejected > 1 ? "s" : ""}`;
+
+  headerCounter.textContent =
+    total + " caméra" + (total > 1 ? "s" : "");
 
   const visible = state.reports.filter(report => {
     if (state.filter === "waiting") return report.status === "waiting";
@@ -779,6 +825,133 @@ document.querySelectorAll(".filter").forEach(button => {
   });
 });
 
+/* ---------- Discussion citoyenne ---------- */
+
+const bannedWords = [
+  "connard", "salope", "pute", "enculé", "encule", "fdp", "ntm",
+  "batard", "bâtard", "mongol", "attardé", "attarde",
+  "negre", "nègre", "bougnoule", "youpin", "meteque", "métèque"
+];
+
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/0/g, "o")
+    .replace(/1/g, "i")
+    .replace(/3/g, "e")
+    .replace(/4/g, "a")
+    .replace(/5/g, "s")
+    .replace(/7/g, "t")
+    .replace(/@/g, "a")
+    .replace(/\$/g, "s");
+}
+
+function messageIsForbidden(text) {
+  const normalized = normalizeText(text);
+
+  return bannedWords.some(word =>
+    normalized.includes(normalizeText(word))
+  );
+}
+
+chatToggle.addEventListener("click", () => {
+  chatPanel.classList.toggle("open");
+
+  if (chatPanel.classList.contains("open") && state.user && !chatLoaded) {
+    loadChatMessages();
+  }
+});
+
+chatForm.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  if (!state.user) {
+    return toast("Connecte-toi pour discuter.", "error");
+  }
+
+  const content = chatInput.value.trim();
+
+  if (!content) return;
+
+  if (messageIsForbidden(content)) {
+    toast(
+      "Message refusé : insultes, racisme et propos haineux sont interdits.",
+      "error"
+    );
+    return;
+  }
+
+  const pseudo = state.user.user_metadata?.pseudo || "Membre";
+
+  const { error } = await db.from("btc_messages").insert({
+    user_id: state.user.id,
+    pseudo,
+    content
+  });
+
+  if (error) {
+    toast(error.message, "error");
+    return;
+  }
+
+  chatInput.value = "";
+  await loadChatMessages();
+});
+
+async function loadChatMessages() {
+  const { data, error } = await db
+    .from("btc_messages")
+    .select("id,pseudo,content,created_at")
+    .eq("status", "visible")
+    .order("created_at", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    toast(error.message, "error");
+    return;
+  }
+
+  messagesBox.replaceChildren();
+
+  for (const message of data || []) {
+    const box = document.createElement("div");
+    box.className = "msg";
+
+    const author = document.createElement("b");
+    author.textContent = message.pseudo;
+
+    const text = document.createElement("div");
+    text.textContent = message.content;
+
+    const date = document.createElement("small");
+    date.textContent = new Date(message.created_at).toLocaleString("fr-FR");
+
+    box.append(author, text, date);
+    messagesBox.append(box);
+  }
+
+  messagesBox.scrollTop = messagesBox.scrollHeight;
+  chatLoaded = true;
+}
+
+db.channel("btc-chat")
+  .on(
+    "postgres_changes",
+    {
+      event: "INSERT",
+      schema: "public",
+      table: "btc_messages"
+    },
+    () => {
+      if (state.user) loadChatMessages();
+    }
+  )
+  .subscribe();
+
+/* ---------- Démarrage ---------- */
+
 db.auth.onAuthStateChange((event, session) => {
   if (event === "SIGNED_IN" && session?.user) {
     enterApp(session.user);
@@ -789,6 +962,8 @@ db.auth.onAuthStateChange((event, session) => {
     state.reports = [];
     reportsList.replaceChildren();
     reportsCounter.textContent = "";
+    messagesBox.replaceChildren();
+    chatLoaded = false;
     showAuth();
   }
 });
