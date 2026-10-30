@@ -174,273 +174,359 @@ textarea{min-height:90px;resize:vertical}
 <div id="status"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
+const db = window.supabase.createClient(
+  "https://oxwpppuvghsaancjajoc.supabase.co",
+  "sb_publishable_1eQSq-_gjzbEAkgaT9X8DA_USkUO2Vn"
+);
+
+const $ = id => document.getElementById(id);
+const APP_URL =
+  "https://yazdog84.github.io/Balance-Ta-Cam/BalanceTaCam/";
+
 let map;
 let selectedMarker;
+let reportMarkers;
 let currentUser = null;
 let reports = [];
-let currentFilter = "all";
+let refreshVersion = 0;
+let statusTimer;
 
-const auth = document.getElementById("auth");
-const app = document.getElementById("app");
-const statusBox = document.getElementById("status");
-const reportsList = document.getElementById("reports-list");
-const reportsCounter = document.getElementById("reports-counter");
-
-function showStatus(message){
-  statusBox.textContent = message;
-  statusBox.classList.add("show");
-  setTimeout(()=>statusBox.classList.remove("show"), 3000);
+function showStatus(message) {
+  $("status").textContent = message;
+  $("status").classList.add("show");
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(
+    () => $("status").classList.remove("show"),
+    7000
+  );
 }
 
-function saveReports(){
-  localStorage.setItem("balanceTaCamReports", JSON.stringify(reports));
+async function runButton(button, action) {
+  button.disabled = true;
+  try {
+    await action();
+  } catch (error) {
+    showStatus(error.message || "Une erreur est survenue.");
+  } finally {
+    button.disabled = false;
+  }
 }
 
-function updateCounter(){
-  const total = reports.length;
-  const validated = reports.filter(report => report.validated).length;
-  const waiting = total - validated;
-
-  reportsCounter.textContent =
-    total + " signalement(s) • " +
-    validated + " validé(s) • " +
-    waiting + " en attente";
-}
-
-function loadReports(){
-  const saved = localStorage.getItem("balanceTaCamReports");
-  reports = saved ? JSON.parse(saved) : [];
-  displayReports();
-}
-
-function displayReports(){
-  updateCounter();
-  reportsList.innerHTML = "";
-
-  reports
-    .filter(report => {
-      if(currentFilter === "waiting") return !report.validated;
-      if(currentFilter === "validated") return report.validated;
-      return true;
-    })
-    .forEach(addReportToList);
-}
-
-function initMap(){
+function initMap() {
   map = L.map("map").setView([48.8566, 2.3522], 13);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
   }).addTo(map);
 
-  map.on("click", function(event){
-    const position = [event.latlng.lat, event.latlng.lng];
+  reportMarkers = L.layerGroup().addTo(map);
 
-    if(selectedMarker){
-      selectedMarker.setLatLng(position);
+  map.on("click", event => {
+    if (selectedMarker) {
+      selectedMarker.setLatLng(event.latlng);
     } else {
-      selectedMarker = L.marker(position).addTo(map);
+      selectedMarker = L.marker(event.latlng).addTo(map);
     }
-
-    showStatus("Position choisie sur la carte.");
+    showStatus("Position sélectionnée.");
   });
 }
 
-function showApp(){
-  auth.classList.add("hidden");
-  app.classList.remove("hidden");
+function textElement(tag, text, className) {
+  const element = document.createElement(tag);
+  element.textContent = text;
+  if (className) element.className = className;
+  return element;
+}
 
-  setTimeout(function(){
-    if (!map) {
-      initMap();
+function displayReports() {
+  $("reports-list").replaceChildren();
+  reportMarkers.clearLayers();
+  $("reports-counter").textContent =
+    reports.length + " signalement(s) partagé(s)";
+
+  reports.forEach(report => {
+    const card = document.createElement("article");
+    card.className = "report";
+
+    card.append(
+      textElement("span", "Non vérifié", "badge"),
+      textElement("h3", report.place),
+      textElement("p", report.description),
+      textElement(
+        "p",
+        "Type : " + report.type +
+        " • Par " + report.pseudo +
+        " • " + new Date(report.created_at).toLocaleDateString("fr-FR"),
+        "meta"
+      )
+    );
+
+    const actions = document.createElement("div");
+    actions.className = "report-actions";
+
+    const locate = textElement("button", "Voir sur la carte");
+    locate.onclick = () => {
+      map.setView([report.lat, report.lng], 17);
+      $("map").scrollIntoView({ behavior: "smooth" });
+    };
+    actions.append(locate);
+
+    if (currentUser && report.user_id === currentUser.id) {
+      const remove = textElement("button", "Supprimer mon signalement");
+
+      remove.onclick = () => runButton(remove, async () => {
+        if (!confirm("Supprimer définitivement ce signalement ?")) return;
+
+        const { error } = await db
+          .from("btc_reports")
+          .delete()
+          .eq("id", report.id)
+          .eq("user_id", currentUser.id);
+
+        if (error) throw error;
+        await loadReports();
+        showStatus("Signalement supprimé.");
+      });
+
+      actions.append(remove);
     }
 
-    map.invalidateSize();
-    loadReports();
-  }, 50);
-  
-}
+    card.append(actions);
+    $("reports-list").append(card);
 
-function showAuth(){
-  app.classList.add("hidden");
-  auth.classList.remove("hidden");
-}
+    const popup = document.createElement("div");
+    popup.append(
+      textElement("strong", report.place),
+      textElement("p", report.description)
+    );
 
-document.getElementById("show-register").addEventListener("click", function(){
-  document.getElementById("login-form").classList.add("hidden");
-  document.getElementById("register-form").classList.remove("hidden");
-});
-
-document.getElementById("show-login").addEventListener("click", function(){
-  document.getElementById("register-form").classList.add("hidden");
-  document.getElementById("login-form").classList.remove("hidden");
-});
-
-document.getElementById("btn-register").addEventListener("click", function(){
-  const pseudo = document.getElementById("register-pseudo").value.trim();
-  const email = document.getElementById("register-email").value.trim();
-  const password = document.getElementById("register-password").value;
-
-  if(!pseudo || !email || !password){
-    showStatus("Remplis tous les champs.");
-    return;
-  }
-
-  currentUser = {pseudo: pseudo, email: email};
-  showStatus("Compte créé. Bienvenue " + pseudo + " !");
-  showApp();
-});
-
-document.getElementById("btn-login").addEventListener("click", function(){
-  const email = document.getElementById("login-email").value.trim();
-  const password = document.getElementById("login-password").value;
-
-  if(!email || !password){
-    showStatus("Entre ton email et ton mot de passe.");
-    return;
-  }
-
-  currentUser = {pseudo: email.split("@")[0], email: email};
-  showStatus("Connexion réussie !");
-  showApp();
-});
-
-document.getElementById("btn-logout").addEventListener("click", function(){
-  currentUser = null;
-  showAuth();
-  showStatus("Tu es déconnecté.");
-});
-
-document.getElementById("btn-center").addEventListener("click", function(){
-  if(!navigator.geolocation){
-    showStatus("La géolocalisation n’est pas disponible.");
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(function(position){
-    const lat = position.coords.latitude;
-    const lng = position.coords.longitude;
-
-    map.setView([lat, lng], 16);
-
-    L.marker([lat, lng]).addTo(map)
-      .bindPopup("Tu es ici")
-      .openPopup();
-
-    showStatus("Carte recentrée sur ta position.");
-  }, function(){
-    showStatus("Impossible d’accéder à ta position.");
+    L.marker([report.lat, report.lng])
+      .addTo(reportMarkers)
+      .bindPopup(popup);
   });
-});
+}
 
-document.getElementById("btn-clear-form").addEventListener("click", function(){
-  document.getElementById("camera-type").value = "publique";
-  document.getElementById("camera-place").value = "";
-  document.getElementById("camera-description").value = "";
-  showStatus("Formulaire effacé.");
-});
+async function loadReports() {
+  if (!currentUser) return;
 
-document.getElementById("btn-save-report").addEventListener("click", function(){
-  if(!selectedMarker){
-    showStatus("Choisis d’abord un point sur la carte.");
-    return;
-  }
+  const version = ++refreshVersion;
 
-  const type = document.getElementById("camera-type").value;
-  const place = document.getElementById("camera-place").value.trim();
-  const description = document.getElementById("camera-description").value.trim();
+  const { data, error } = await db
+    .from("btc_reports")
+    .select("id,user_id,pseudo,type,place,description,lat,lng,created_at")
+    .order("created_at", { ascending: false })
+    .limit(500);
 
-  if(!place || !description){
-    showStatus("Ajoute un lieu et une description.");
-    return;
-  }
+  if (version !== refreshVersion || !currentUser) return;
+  if (error) throw error;
 
-  const position = selectedMarker.getLatLng();
-
-  const report = {
-    id: Date.now(),
-    pseudo: currentUser ? currentUser.pseudo : "Anonyme",
-    type: type,
-    place: place,
-    description: description,
-    lat: position.lat,
-    lng: position.lng,
-    date: new Date().toLocaleDateString("fr-FR"),
-    validated: false,
-    validations: 0
-  };
-
-  reports.unshift(report);
-  saveReports();
+  reports = data || [];
   displayReports();
+}
 
-  document.getElementById("camera-place").value = "";
-  document.getElementById("camera-description").value = "";
+function applySession(session) {
+  currentUser = session ? session.user : null;
+  $("auth").classList.toggle("hidden", !!currentUser);
+  $("app").classList.toggle("hidden", !currentUser);
 
-  showStatus("Signalement enregistré !");
-});
-
-document.querySelectorAll(".filter").forEach(button => {
-  button.addEventListener("click", function(){
-    document.querySelectorAll(".filter").forEach(item => item.classList.remove("active"));
-    button.classList.add("active");
-    currentFilter = button.dataset.filter;
-    displayReports();
-  });
-});
-
-function addReportToList(report){
-  const div = document.createElement("div");
-  div.className = "report";
-
-  const badgeClass = report.validated ? "badge ok" : "badge";
-  const badgeText = report.validated ? "Validé" : "En attente • " + report.validations + "/5";
-
-  div.innerHTML =
-    '<div class="report-top">' +
-      '<span class="' + badgeClass + '">' + badgeText + '</span>' +
-      '<span class="meta">' + report.date + '</span>' +
-    '</div>' +
-    '<h3>' + report.place + '</h3>' +
-    '<p>' + report.description + '</p>' +
-    '<p class="meta">Type : ' + report.type + ' • Par ' + report.pseudo + '</p>' +
-    '<div class="report-actions">' +
-      '<button class="validate">Valider</button>' +
-      '<button class="refute">Réfuter</button>' +
-    '</div>';
-
-  const validateBtn = div.querySelector(".validate");
-  const refuteBtn = div.querySelector(".refute");
-
-  if(report.validated){
-    validateBtn.disabled = true;
-    refuteBtn.disabled = true;
+  if (!currentUser) {
+    ++refreshVersion;
+    reports = [];
+    $("reports-list").replaceChildren();
+    if (reportMarkers) reportMarkers.clearLayers();
+    if (selectedMarker) {
+      selectedMarker.remove();
+      selectedMarker = null;
+    }
+    return;
   }
 
-  validateBtn.addEventListener("click", function(){
-    report.validations = report.validations + 1;
+  setTimeout(() => {
+    if (!currentUser) return;
+    if (!map) initMap();
+    map.invalidateSize();
+    loadReports().catch(error => showStatus(error.message));
+  }, 50);
+}
 
-    if(report.validations >= 5){
-      report.validated = true;
-      showStatus("Signalement validé après 5 validations !");
-    } else {
-      showStatus("Validation enregistrée : " + report.validations + "/5");
+$("show-register").onclick = () => {
+  $("login-form").classList.add("hidden");
+  $("register-form").classList.remove("hidden");
+};
+
+$("show-login").onclick = () => {
+  $("register-form").classList.add("hidden");
+  $("login-form").classList.remove("hidden");
+};
+
+$("btn-register").onclick = event =>
+  runButton(event.currentTarget, async () => {
+    const pseudo = $("register-pseudo").value.trim();
+    const email = $("register-email").value.trim();
+    const password = $("register-password").value;
+
+    if (!pseudo || pseudo.length > 60) {
+      throw new Error("Choisis un pseudo de 1 à 60 caractères.");
+    }
+    if (!$("register-email").checkValidity() || !email) {
+      throw new Error("Entre une adresse email valide.");
+    }
+    if (password.length < 12) {
+      throw new Error("Choisis un mot de passe d’au moins 12 caractères.");
     }
 
-    saveReports();
-    displayReports();
+    const { data, error } = await db.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { pseudo },
+        emailRedirectTo: APP_URL
+      }
+    });
+
+    if (error) throw error;
+
+    $("register-password").value = "";
+
+    if (data.session) {
+      showStatus("Compte créé. Tu es connecté.");
+    } else {
+      $("show-login").click();
+      showStatus(
+        "Si l’inscription est acceptée, tu recevras un email. " +
+        "Vérifie ta boîte et les indésirables, puis confirme ton adresse."
+      );
+    }
   });
 
-  refuteBtn.addEventListener("click", function(){
-    reports = reports.filter(item => item.id !== report.id);
-    saveReports();
-    displayReports();
-    showStatus("Signalement supprimé.");
+$("btn-login").onclick = event =>
+  runButton(event.currentTarget, async () => {
+    const email = $("login-email").value.trim();
+    const password = $("login-password").value;
+
+    if (!email || !password) {
+      throw new Error("Entre ton email et ton mot de passe.");
+    }
+
+    const { error } = await db.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+    $("login-password").value = "";
+    showStatus("Connexion réussie.");
   });
 
-  reportsList.appendChild(div);
+$("btn-logout").onclick = event =>
+  runButton(event.currentTarget, async () => {
+    const { error } = await db.auth.signOut();
+    if (error) throw error;
+    showStatus("Déconnexion effectuée.");
+  });
+
+function centerOnMe() {
+  if (!navigator.geolocation) {
+    showStatus("Géolocalisation indisponible.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      if (!currentUser || !map) return;
+      map.setView(
+        [position.coords.latitude, position.coords.longitude],
+        16
+      );
+      showStatus("Carte recentrée. Touche la carte pour choisir un point.");
+    },
+    () => showStatus(
+      "Position inaccessible. Autorise la localisation ou choisis un point sur la carte."
+    ),
+    { timeout: 15000, maximumAge: 60000 }
+  );
 }
+
+$("btn-center").onclick = centerOnMe;
+$("btn-my-area").onclick = centerOnMe;
+
+function clearForm() {
+  $("camera-type").value = "publique";
+  $("camera-place").value = "";
+  $("camera-description").value = "";
+
+  if (selectedMarker) {
+    selectedMarker.remove();
+    selectedMarker = null;
+  }
+}
+
+$("btn-clear-form").onclick = clearForm;
+
+$("camera-place").maxLength = 200;
+$("camera-description").maxLength = 2000;
+
+$("btn-save-report").onclick = event =>
+  runButton(event.currentTarget, async () => {
+    if (!currentUser) throw new Error("Connecte-toi d’abord.");
+    if (!selectedMarker) {
+      throw new Error("Choisis un point sur la carte.");
+    }
+
+    const place = $("camera-place").value.trim();
+    const description = $("camera-description").value.trim();
+
+    if (!place || !description) {
+      throw new Error("Ajoute un lieu et une description.");
+    }
+
+    const position = selectedMarker.getLatLng();
+    const pseudo = String(
+      currentUser.user_metadata?.pseudo || "Membre"
+    ).slice(0, 60);
+
+    const { error } = await db.from("btc_reports").insert({
+      user_id: currentUser.id,
+      pseudo,
+      type: $("camera-type").value,
+      place,
+      description,
+      lat: position.lat,
+      lng: position.lng
+    });
+
+    if (error) throw error;
+
+    clearForm();
+    await loadReports();
+    showStatus("Signalement enregistré dans la base partagée.");
+  });
+
+const filters = document.querySelector(".filters");
+if (filters) filters.classList.add("hidden");
+
+const refreshButton = textElement("button", "Actualiser les signalements");
+refreshButton.className = "secondary";
+refreshButton.style.marginBottom = "12px";
+refreshButton.onclick = () => runButton(refreshButton, loadReports);
+$("reports-list").before(refreshButton);
+
+db.auth.onAuthStateChange((_event, session) => {
+  applySession(session);
+});
+
+db.auth.getSession().then(({ data, error }) => {
+  if (error) {
+    showStatus(error.message);
+    return;
+  }
+  applySession(data.session);
+});
 </script>
 
 </body>
