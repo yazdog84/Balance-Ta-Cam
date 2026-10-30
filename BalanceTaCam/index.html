@@ -252,9 +252,14 @@ function showApp(){
   app.classList.remove("hidden");
 
   setTimeout(function(){
-    initMap();
+    if (!map) {
+      initMap();
+    }
+
+    map.invalidateSize();
     loadReports();
   }, 50);
+  
 }
 
 function showAuth(){
