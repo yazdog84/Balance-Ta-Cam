@@ -84,6 +84,8 @@ textarea{min-height:90px;resize:vertical}
 .chat{position:fixed;left:0;right:0;bottom:0;height:72vh;background:#fff;display:none;flex-direction:column;border-radius:16px 16px 0 0;z-index:1100;box-shadow:0 -6px 20px rgba(0,0,0,.2)}
 .chat.open{display:flex}
 .chat header{background:#0b3d62;color:#fff;padding:12px 16px}
+.chat-header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.chat-close{background:#f2b705;color:#12232e;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;font-weight:800;cursor:pointer}
 #messages{flex:1;overflow:auto;padding:12px}
 .msg{background:#eef3f7;padding:8px 10px;border-radius:12px;margin-bottom:8px;font-size:14px}
 .msg small{display:block;color:#5b6b76;margin-top:3px}
@@ -228,7 +230,10 @@ textarea{min-height:90px;resize:vertical}
 <button class="chat-btn" id="chat-toggle" type="button">💬</button>
 
 <div class="chat" id="chat">
-  <header><b>Discussion citoyenne</b></header>
+  <header class="chat-header">
+    <b>Discussion citoyenne</b>
+    <button id="chat-close" type="button" class="chat-close">✕</button>
+  </header>
 
   <p class="notice">
     Respect obligatoire : insultes, racisme, haine, harcèlement et menaces sont interdits.
@@ -864,6 +869,10 @@ chatToggle.addEventListener("click", () => {
   }
 });
 
+el("chat-close").addEventListener("click", () => {
+  chatPanel.classList.remove("open");
+});
+
 chatForm.addEventListener("submit", async event => {
   event.preventDefault();
 
@@ -945,31 +954,4 @@ db.channel("btc-chat")
       table: "btc_messages"
     },
     () => {
-      if (state.user) loadChatMessages();
-    }
-  )
-  .subscribe();
-
-/* ---------- Démarrage ---------- */
-
-db.auth.onAuthStateChange((event, session) => {
-  if (event === "SIGNED_IN" && session?.user) {
-    enterApp(session.user);
-  }
-
-  if (event === "SIGNED_OUT") {
-    state.user = null;
-    state.reports = [];
-    reportsList.replaceChildren();
-    reportsCounter.textContent = "";
-    messagesBox.replaceChildren();
-    chatLoaded = false;
-    showAuth();
-  }
-});
-
-boot();
-</script>
-
-</body>
-</html>
+      if (state.user)
