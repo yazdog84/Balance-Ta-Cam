@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Balance Ta Cam</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12232e">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:#e8f0f2;color:#12232e;min-height:100vh}
+.hidden{display:none!important}
+
+header{background:#12232e;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand h1{font-size:22px}
+header .actions{display:flex;gap:10px;flex-wrap:wrap}
+
+button{border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:#f2b705;color:#12232e}
+button.secondary{background:#20303c;color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+
+main{max-width:1000px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:16px;padding:18px;box-shadow:0 6px 18px rgba(0,0,0,.08);margin-bottom:18px}
+h2{margin-bottom:10px}
+p.muted{color:#5b6b76}
+
+#auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(180deg,#e8f0f2,#d7e5ea)}
+.auth-box{background:#fff;border-radius:20px;padding:28px;width:100%;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+.title-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px}
+.camera-logo{width:80px;height:66px}
+.auth-box h2{text-align:center;margin-bottom:6px}
+.auth-box .sub{text-align:center;color:#5b6b76;margin-bottom:18px}
+
+label{display:block;font-weight:700;margin:12px 0 6px}
+input,select,textarea{width:100%;padding:12px;border:2px solid #d7e5ea;border-radius:10px;font-size:16px}
+textarea{min-height:90px;resize:vertical}
+.btn-full{width:100%;margin-top:16px;padding:14px;font-size:16px}
+.auth-switch{text-align:center;margin-top:14px;font-size:14px}
+.auth-switch a{color:#0b6bcb;cursor:pointer;text-decoration:underline}
+
+#map{height:420px;border-radius:14px;overflow:hidden;border:2px solid #d7e5ea}
+.map-tools{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.form-grid{grid-template-columns:1fr}}
+.form-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filters button.active{background:#12232e;color:#fff}
+
+.report{border:2px solid #e6eef1;border-radius:14px;padding:14px;margin-bottom:12px}
+.report-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;background:#fff4d6;color:#8a6100}
+.badge.ok{background:#e6f6ea;color:#1c7c3c}
+.report h3{margin:6px 0 4px}
+.report p{margin:4px 0}
+.report .meta{font-size:13px;color:#5b6b76}
+.report-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.report-actions button{padding:8px 10px;font-size:13px}
+
+#status{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#12232e;color:#fff;padding:12px 18px;border-radius:12px;display:none;z-index:9999}
+#status.show{display:block}
+</style>
+</head>
+<body>
+
+<section id="auth">
+  <div class="auth-box">
+    <div class="title-row">
+      <h2>Balance Ta Cam</h2>
+      <svg class="camera-logo" viewBox="0 0 100 88" aria-hidden="true">
+        <path d="M34 26 Q40 20 46 26" stroke="#12232e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <path d="M28 18 Q40 6 52 18" stroke="#12232e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <path d="M22 10 Q40 -8 58 10" stroke="#12232e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <rect x="10" y="34" width="56" height="30" rx="10" fill="#f2b705" stroke="#12232e" stroke-width="3"/>
+        <path d="M66 40 L88 30 L88 68 L66 58 Z" fill="#f2b705" stroke="#12232e" stroke-width="3"/>
+        <circle cx="31" cy="49" r="9" fill="#fff" stroke="#12232e" stroke-width="2.5"/>
+        <circle cx="28" cy="50" r="3.5" fill="#12232e"/>
+        <circle cx="53" cy="49" r="9" fill="#fff" stroke="#12232e" stroke-width="2.5"/>
+        <circle cx="56" cy="50" r="3.5" fill="#12232e"/>
+      </svg>
+    </div>
+
+    <p class="sub">Signale les caméras de surveillance autour de toi.</p>
+
+    <div id="login-form">
+      <label for="login-email">Email</label>
+      <input id="login-email" type="email" placeholder="ton@email.com">
+      <label for="login-password">Mot de passe</label>
+      <input id="login-password" type="password" placeholder="Ton mot de passe">
+      <button class="btn-full" id="btn-login">Se connecter</button>
+      <p class="auth-switch">Pas encore de compte ? <a id="show-register">Créer un compte</a></p>
+    </div>
+
+    <div id="register-form" class="hidden">
+      <label for="register-pseudo">Pseudo</label>
+      <input id="register-pseudo" type="text" placeholder="Ton pseudo">
+      <label for="register-email">Email</label>
+      <input id="register-email" type="email" placeholder="ton@email.com">
+      <label for="register-password">Mot de passe</label>
+      <input id="register-password" type="password" placeholder="Choisis un mot de passe">
+      <button class="btn-full" id="btn-register">Créer mon compte</button>
+      <p class="auth-switch">Tu as déjà un compte ? <a id="show-login">Se connecter</a></p>
+    </div>
+  </div>
+</section>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="brand">
+      <span>🎥</span>
+      <h1>Balance Ta Cam</h1>
+    </div>
+    <div class="actions">
+      <button id="btn-my-area">Ma zone</button>
+      <button id="btn-logout" class="secondary">Déconnexion</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Carte des caméras</h2>
+      <p class="muted">Clique sur la carte pour choisir l’endroit du signalement.</p>
+      <div id="map"></div>
+      <div class="map-tools">
+        <button id="btn-center">Recentrer sur moi</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Nouveau signalement</h2>
+      <div class="form-grid">
+        <div>
+          <label for="camera-type">Type de caméra</label>
+          <select id="camera-type">
+            <option value="publique">Caméra publique</option>
+            <option value="privee">Caméra privée</option>
+            <option value="douteuse">Caméra douteuse</option>
+          </select>
+        </div>
+        <div>
+          <label for="camera-place">Lieu</label>
+          <input id="camera-place" type="text" placeholder="Ex : devant la boulangerie">
+        </div>
+      </div>
+      <label for="camera-description">Description</label>
+      <textarea id="camera-description" placeholder="Décris la caméra, sa position, ce qu’elle filme…"></textarea>
+      <div class="form-actions">
+        <button id="btn-save-report">Enregistrer le signalement</button>
+        <button id="btn-clear-form" class="secondary">Effacer</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Signalements</h2>
+      <p id="reports-counter" class="muted"></p>
+
+      <div class="filters">
+        <button class="filter active" data-filter="all">Tous</button>
+        <button class="filter" data-filter="waiting">En attente</button>
+        <button class="filter" data-filter="validated">Validés</button>
+      </div>
+
+      <div id="reports-list"></div>
+    </section>
+  </main>
+</div>
+
+<div id="status"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map;
+let selectedMarker;
+let currentUser = null;
+let reports = [];
+let currentFilter = "all";
+
+const auth = document.getElementById("auth");
+const app = document.getElementById("app");
+const statusBox = document.getElementById("status");
+const reportsList = document.getElementById("reports-list");
+const reportsCounter = document.getElementById("reports-counter");
+
+function showStatus(message){
+  statusBox.textContent = message;
+  statusBox.classList.add("show");
+  setTimeout(()=>statusBox.classList.remove("show"), 3000);
+}
+
+function saveReports(){
+  localStorage.setItem("balanceTaCamReports", JSON.stringify(reports));
+}
+
+function updateCounter(){
+  const total = reports.length;
+  const validated = reports.filter(report => report.validated).length;
+  const waiting = total - validated;
+
+  reportsCounter.textContent =
+    total + " signalement(s) • " +
+    validated + " validé(s) • " +
+    waiting + " en attente";
+}
+
+function loadReports(){
+  const saved = localStorage.getItem("balanceTaCamReports");
+  reports = saved ? JSON.parse(saved) : [];
+  displayReports();
+}
+
+function displayReports(){
+  updateCounter();
+  reportsList.innerHTML = "";
+
+  reports
+    .filter(report => {
+      if(currentFilter === "waiting") return !report.validated;
+      if(currentFilter === "validated") return report.validated;
+      return true;
+    })
+    .forEach(addReportToList);
+}
+
+function initMap(){
+  map = L.map("map").setView([48.8566, 2.3522], 13);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+
+  map.on("click", function(event){
+    const position = [event.latlng.lat, event.latlng.lng];
+
+    if(selectedMarker){
+      selectedMarker.setLatLng(position);
+    } else {
+      selectedMarker = L.marker(position).addTo(map);
+    }
+
+    showStatus("Position choisie sur la carte.");
+  });
+}
+
+function showApp(){
+  auth.classList.add("hidden");
+  app.classList.remove("hidden");
+
+  setTimeout(function(){
+    initMap();
+    loadReports();
+  }, 50);
+}
+
+function showAuth(){
+  app.classList.add("hidden");
+  auth.classList.remove("hidden");
+}
+
+document.getElementById("show-register").addEventListener("click", function(){
+  document.getElementById("login-form").classList.add("hidden");
+  document.getElementById("register-form").classList.remove("hidden");
+});
+
+document.getElementById("show-login").addEventListener("click", function(){
+  document.getElementById("register-form").classList.add("hidden");
+  document.getElementById("login-form").classList.remove("hidden");
+});
+
+document.getElementById("btn-register").addEventListener("click", function(){
+  const pseudo = document.getElementById("register-pseudo").value.trim();
+  const email = document.getElementById("register-email").value.trim();
+  const password = document.getElementById("register-password").value;
+
+  if(!pseudo || !email || !password){
+    showStatus("Remplis tous les champs.");
+    return;
+  }
+
+  currentUser = {pseudo: pseudo, email: email};
+  showStatus("Compte créé. Bienvenue " + pseudo + " !");
+  showApp();
+});
+
+document.getElementById("btn-login").addEventListener("click", function(){
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+
+  if(!email || !password){
+    showStatus("Entre ton email et ton mot de passe.");
+    return;
+  }
+
+  currentUser = {pseudo: email.split("@")[0], email: email};
+  showStatus("Connexion réussie !");
+  showApp();
+});
+
+document.getElementById("btn-logout").addEventListener("click", function(){
+  currentUser = null;
+  showAuth();
+  showStatus("Tu es déconnecté.");
+});
+
+document.getElementById("btn-center").addEventListener("click", function(){
+  if(!navigator.geolocation){
+    showStatus("La géolocalisation n’est pas disponible.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(function(position){
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+
+    map.setView([lat, lng], 16);
+
+    L.marker([lat, lng]).addTo(map)
+      .bindPopup("Tu es ici")
+      .openPopup();
+
+    showStatus("Carte recentrée sur ta position.");
+  }, function(){
+    showStatus("Impossible d’accéder à ta position.");
+  });
+});
+
+document.getElementById("btn-clear-form").addEventListener("click", function(){
+  document.getElementById("camera-type").value = "publique";
+  document.getElementById("camera-place").value = "";
+  document.getElementById("camera-description").value = "";
+  showStatus("Formulaire effacé.");
+});
+
+document.getElementById("btn-save-report").addEventListener("click", function(){
+  if(!selectedMarker){
+    showStatus("Choisis d’abord un point sur la carte.");
+    return;
+  }
+
+  const type = document.getElementById("camera-type").value;
+  const place = document.getElementById("camera-place").value.trim();
+  const description = document.getElementById("camera-description").value.trim();
+
+  if(!place || !description){
+    showStatus("Ajoute un lieu et une description.");
+    return;
+  }
+
+  const position = selectedMarker.getLatLng();
+
+  const report = {
+    id: Date.now(),
+    pseudo: currentUser ? currentUser.pseudo : "Anonyme",
+    type: type,
+    place: place,
+    description: description,
+    lat: position.lat,
+    lng: position.lng,
+    date: new Date().toLocaleDateString("fr-FR"),
+    validated: false,
+    validations: 0
+  };
+
+  reports.unshift(report);
+  saveReports();
+  displayReports();
+
+  document.getElementById("camera-place").value = "";
+  document.getElementById("camera-description").value = "";
+
+  showStatus("Signalement enregistré !");
+});
+
+document.querySelectorAll(".filter").forEach(button => {
+  button.addEventListener("click", function(){
+    document.querySelectorAll(".filter").forEach(item => item.classList.remove("active"));
+    button.classList.add("active");
+    currentFilter = button.dataset.filter;
+    displayReports();
+  });
+});
+
+function addReportToList(report){
+  const div = document.createElement("div");
+  div.className = "report";
+
+  const badgeClass = report.validated ? "badge ok" : "badge";
+  const badgeText = report.validated ? "Validé" : "En attente • " + report.validations + "/5";
+
+  div.innerHTML =
+    '<div class="report-top">' +
+      '<span class="' + badgeClass + '">' + badgeText + '</span>' +
+      '<span class="meta">' + report.date + '</span>' +
+    '</div>' +
+    '<h3>' + report.place + '</h3>' +
+    '<p>' + report.description + '</p>' +
+    '<p class="meta">Type : ' + report.type + ' • Par ' + report.pseudo + '</p>' +
+    '<div class="report-actions">' +
+      '<button class="validate">Valider</button>' +
+      '<button class="refute">Réfuter</button>' +
+    '</div>';
+
+  const validateBtn = div.querySelector(".validate");
+  const refuteBtn = div.querySelector(".refute");
+
+  if(report.validated){
+    validateBtn.disabled = true;
+    refuteBtn.disabled = true;
+  }
+
+  validateBtn.addEventListener("click", function(){
+    report.validations = report.validations + 1;
+
+    if(report.validations >= 5){
+      report.validated = true;
+      showStatus("Signalement validé après 5 validations !");
+    } else {
+      showStatus("Validation enregistrée : " + report.validations + "/5");
+    }
+
+    saveReports();
+    displayReports();
+  });
+
+  refuteBtn.addEventListener("click", function(){
+    reports = reports.filter(item => item.id !== report.id);
+    saveReports();
+    displayReports();
+    showStatus("Signalement supprimé.");
+  });
+
+  reportsList.appendChild(div);
+}
+</script>
+
+</body>
+</html>

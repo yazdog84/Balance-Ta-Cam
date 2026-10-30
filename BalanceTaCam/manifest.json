@@ -1,0 +1,26 @@
+{
+  "name": "Balance ta cam — BTC",
+  "short_name": "BTC",
+  "description": "Carte citoyenne des caméras : sécurité, transparence et discussion locale.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b3d62",
+  "theme_color": "#0b3d62",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "scope": "/",
+  "lang": "fr",
+  "id": "/"
+}
