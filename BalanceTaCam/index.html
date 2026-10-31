@@ -954,16 +954,6 @@ db.channel("btc-chat")
       table: "btc_messages"
     },
     () => {
-      if (state.user)
-db.channel("btc-chat")
-  .on(
-    "postgres_changes",
-    {
-      event: "INSERT",
-      schema: "public",
-      table: "btc_messages"
-    },
-    () => {
       if (state.user) {
         loadChatMessages();
       }
